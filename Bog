@@ -1,0 +1,110 @@
+extends RigidBody3D
+
+@export_range(1, 4) var num_players: int = 4
+@export var thrust_force: float = 35.0
+@export var donut_radius: float = 3.0
+
+var players = []
+
+@onready var players_container = $PlayersNode
+
+func _ready():
+	_init_players()
+	_setup_players_visuals()
+
+func _init_players():
+	players.clear()
+	var colors = [Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW]
+	var slot_size = 360.0 / float(num_players)
+	
+	for i in range(num_players):
+		var slot = i * slot_size
+		players.append({
+			"slot": slot,
+			"current_pos_ratio": 0.5,
+			"is_thrusting": false,
+			"color": colors[i],
+			"mesh": null
+		})
+
+func _setup_players_visuals():
+	for child in players_container.get_children():
+		child.queue_free()
+		
+	for i in range(players.size()):
+		var p_mesh = MeshInstance3D.new()
+		var box = BoxMesh.new()
+		box.size = Vector3(0.6, 0.6, 1.2)
+		p_mesh.mesh = box
+		
+		var mat = StandardMaterial3D.new()
+		mat.albedo_color = players[i]["color"]
+		p_mesh.material_override = mat
+		
+		players_container.add_child(p_mesh)
+		players[i]["mesh"] = p_mesh
+		_update_player_transform(i)
+
+func _process(delta):
+	_handle_input(delta)
+	for i in range(players.size()):
+		_update_player_transform(i)
+
+func _handle_input(delta):
+	var speed = 1.5
+	
+	if num_players > 0:
+		if Input.is_key_pressed(KEY_A):
+			players[0]["current_pos_ratio"] = clamp(players[0]["current_pos_ratio"] - speed * delta, 0.0, 1.0)
+		if Input.is_key_pressed(KEY_D):
+			players[0]["current_pos_ratio"] = clamp(players[0]["current_pos_ratio"] + speed * delta, 0.0, 1.0)
+		players[0]["is_thrusting"] = Input.is_key_pressed(KEY_SPACE)
+
+	if num_players > 1:
+		if Input.is_key_pressed(KEY_LEFT):
+			players[1]["current_pos_ratio"] = clamp(players[1]["current_pos_ratio"] - speed * delta, 0.0, 1.0)
+		if Input.is_key_pressed(KEY_RIGHT):
+			players[1]["current_pos_ratio"] = clamp(players[1]["current_pos_ratio"] + speed * delta, 0.0, 1.0)
+		players[1]["is_thrusting"] = Input.is_key_pressed(KEY_KP_ENTER) or Input.is_key_pressed(KEY_ENTER)
+
+	if num_players > 2:
+		if Input.is_key_pressed(KEY_J):
+			players[2]["current_pos_ratio"] = clamp(players[2]["current_pos_ratio"] - speed * delta, 0.0, 1.0)
+		if Input.is_key_pressed(KEY_L):
+			players[2]["current_pos_ratio"] = clamp(players[2]["current_pos_ratio"] + speed * delta, 0.0, 1.0)
+		players[2]["is_thrusting"] = Input.is_key_pressed(KEY_K)
+
+	if num_players > 3:
+		if Input.is_key_pressed(KEY_F):
+			players[3]["current_pos_ratio"] = clamp(players[3]["current_pos_ratio"] - speed * delta, 0.0, 1.0)
+		if Input.is_key_pressed(KEY_H):
+			players[3]["current_pos_ratio"] = clamp(players[3]["current_pos_ratio"] + speed * delta, 0.0, 1.0)
+		players[3]["is_thrusting"] = Input.is_key_pressed(KEY_G)
+
+func _get_player_angle_rad(player_index: int) -> float:
+	var p = players[player_index]
+	var slot_size = 360.0 / float(num_players)
+	var gap = 8.0 if num_players > 1 else 0.0
+	var actual_size = slot_size - gap
+	var min_angle = deg_to_rad(p["slot"] + (gap / 2.0))
+	var max_angle = min_angle + deg_to_rad(actual_size)
+	return lerp(min_angle, max_angle, p["current_pos_ratio"])
+
+func _update_player_transform(i: int):
+	var angle = _get_player_angle_rad(i)
+	var local_pos = Vector3(cos(angle) * donut_radius, 0, sin(angle) * donut_radius)
+	var p_mesh = players[i]["mesh"] as MeshInstance3D
+	p_mesh.position = local_pos
+	p_mesh.rotation.y = -angle
+
+func _physics_process(delta):
+	for i in range(players.size()):
+		var p = players[i]
+		if p["is_thrusting"]:
+			var angle = _get_player_angle_rad(i)
+			var local_pos = Vector3(cos(angle) * donut_radius, 0, sin(angle) * donut_radius)
+			var global_thrust_point = to_global(local_pos)
+			var local_dir = local_pos.normalized()
+			var global_dir = global_transform.basis * local_dir
+			var force_vector = -global_dir * thrust_force
+			apply_force(force_vector, global_thrust_point - global_transform.origin)
