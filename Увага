@@ -1,0 +1,12 @@
+extends Area3D
+
+func _ready():
+	# Подключаем сигнал столкновения
+	body_entered.connect(_on_body_entered)
+
+func _on_body_entered(body):
+	# Проверяем, что столкнулся именно наш бублик
+	if body.name == "DonutShip" or body is RigidBody3D:
+		print("Столкновение с преградой! Проигрыш.")
+		# Перезапускаем текущую сцену (можете заменить на вызов экрана поражения)
+		get_tree().reload_current_scene()
